@@ -1,60 +1,60 @@
 import chainlit as cl
-from langchain_google_vertexai.chat_models import ChatVertexAI
-from langchain_experimental.tools.python.tool import PythonAstREPLTool
-from langchain_community.tools import DuckDuckGoSearchRun
-from langchain_core.prompts import PromptTemplate
-from langchain.agents import initialize_agent
-from langchain.memory import ConversationBufferMemory
-import pandas as pd
+import utils
+from langchain_core.messages import HumanMessage
+import uuid
 import os
-from dotenv import load_dotenv
 
-# Load environment variables from a .env file
-load_dotenv()
+# Define global variables for workflow and config
+workflow = None
+config = None
 
-# Load dataset and initialize models/tools as before...
-df = pd.read_csv("clean-food.csv")
-chat_model = ChatVertexAI(model_name="gemini-1.5-pro", seed=42, temperature=0)
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-python_tool = PythonAstREPLTool(globals={"df": df})
-duckduckgo_tool = DuckDuckGoSearchRun()
-tools = [python_tool, duckduckgo_tool]
+@cl.on_chat_start
+async def init_graph():
+    """
+    Initializes the workflow graph and configuration when the chat starts.
+    """
+    global workflow, config
+    try:
+        # Create the workflow using utils
+        workflow = utils.create_graph()
+        # Generate a unique thread ID for this session
+        thread_id = uuid.uuid4()
+        config = {"configurable": {"thread_id": thread_id}}
 
-system_prompt = PromptTemplate.from_template("""
+        await cl.Message(content="""Hey there, welcome to Nutrisense AI, where we take care of your daily dietary needs! 
+                         Don't know what to make today? Worry not, we got you covered. Just tell me what you have and we'll do the rest.""").send()
+    except Exception as e:
+        # Handle any exceptions and send the error message to the UI
+        await cl.Message(content=f"Error: {str(e)}").send()
 
-You are a skilled culinary and nutrition expert, adept at creating delicious and nutritious recipes. Your task is to provide:
-
-1. Accurate Nutritional Information: ALWAYS Utilize the provided dataset given below to deliver precise nutritional values for various foods. 
-    Only If a specific food isn't in the dataset, conduct a reliable online search to obtain accurate information.
-2. Detailed Numerical Values: When asked about nutrition in any food, always try to give quantifiable numerical values. Only if you are not able to find any values in the 'df' and online, give a descriptive answer.
-2. Detailed Recipes: Craft comprehensive recipes, including a clear title, a list of necessary ingredients, and step-by-step instructions.
-3. Engaging Visuals: When you return nutritious values, always include a plot that the user can see to visualize the values.
-Guidelines:
-- Prioritize Dataset: Always consult the `df` dataset first for nutritional values.
-- Online Verification: If the dataset lacks information, cross-reference with reputable online sources.
-- Clear and Concise: Present information in a clear, concise, and easy-to-understand manner.
-- Recipe Relevance: When suggesting recipes based on user-provided ingredients, prioritize those with the highest ingredient match.
-- Display Recipe: When asked for a recipe, give a detailed explaination on how to make it instead of asking them to search online.
-- Nutritional Insights: Provide context for nutritional values, explaining their significance and potential health benefits.
-
-Dataset Reference:
-\n""" + df.to_markdown(index=True))
-
-agent = initialize_agent(tools=tools, llm=chat_model, agent="zero-shot-react-description", prompt=system_prompt, memory=memory, verbose=True)
-
-@cl.on_start
-def start():
-    cl.Message(content="Welcome to the Health and Nutrition Chatbot! How can I assist you today?").send()
 
 @cl.on_message
-def handle_message(message):
-    response = agent.invoke(message)
-    cl.Message(content=response['output']).send()
+async def query(message: cl.Message):
+    """
+    Processes user input and streams responses from the workflow graph.
+    """
+    global workflow, config
+    try:
+        if workflow is None or config is None:
+            raise ValueError("Workflow or config not initialized. Please restart the session.")
 
-@cl.on_click("nutritional_info")
-def nutritional_info():
-    cl.Message(content="Please enter the food item you want nutritional information about:").send()
+        # Create input for the workflow
+        inputs = {"messages": [HumanMessage(content=message.content)]}
+        # print("Inputs: ", inputs)
+        # Stream messages from the workflow
+        async for s in workflow.astream(inputs, stream_mode="values", config=config):
 
-@cl.on_click("healthy_recipes")
-def healthy_recipes():
-    cl.Message(content="Please provide ingredients for the recipe you want:").send()
+            if "messages" in s:
+                last_message = s["messages"][-1]
+                
+                # Send messages to Chainlit UI
+                if isinstance(last_message, str):
+                    await cl.Message(content=last_message).send()
+                else:
+                    if last_message.name == "recipe_node" or last_message.name == "visual_node":
+                        await cl.Message(content=last_message.content).send()
+        # if os.path.exists("plot.png"):
+        await cl.Message(content = "Here is the nutritional information graph:",elements=[cl.Image(path="plot.png", size="large")]).send()
+    except Exception as e:
+        # Handle any exceptions and send the error message to the UI
+        await cl.Message(content=f"Error: {str(e)}").send()
