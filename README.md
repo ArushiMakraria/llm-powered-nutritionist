@@ -35,7 +35,7 @@ NutriSense AI is a smart nutrition assistant powered by **Large Language Models 
 1. Clone the repository:  
    ```bash  
    git clone https://github.com/ArushiMakraria/llm-powered-nutritionist.git  
-   cd llm-powered-nutritionist  ```
+   cd llm-powered-nutritionist  
 
 ## Future Scope
 - Augmenting the ingredient repository with user-contributed data.
