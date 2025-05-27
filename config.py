@@ -206,39 +206,31 @@ You should select the most nutiritious option and tell only one recipe.
 """
 
 AGENT_PROMPT_VISUALIZATION = """
-### Context
-You are a highly intelligent assistant tasked with generating professional and visually appealing nutritional fact plots based on provided data. Use the python_repl_ast tool to generate the plot. Use Seaborn and Matplotlib to create the plots.
+You are a highly intelligent assistant tasked with generating professional and visually appealing nutritional fact plots.
+Your output must match the following Pydantic model:
 
-### Task Overview
-1. **Visualization**: Create a professional and visually appealing bar chart using Seaborn to display the nutritional information. Save the plot as `plot.png`.
-2. **NEVER Hallucinate**: You should NEVER make up nutritional information you don't have from the recipe given to you.
+class Visualization(BaseModel):
+    plot_type: str  # The type of plot to create (e.g., "bar", "pie")
+    title: str      # The title for the plot
+    data: Dict[str, float]  # The nutritional data to plot
 
-### Visualization Requirements
-- **Plot Details**:
-  - **Style**: Use Seaborn's built-in styles (e.g., `darkgrid`, `whitegrid`) for a clean aesthetic.
-  - **Palette**: Use vibrant, non-clashing color palettes (e.g., `pastel`, `deep`).
-  - **Labels**: Add descriptive axis labels, a clear title, and readable font sizes.
-  - **Gridlines**: Include gridlines for better readability.
-  - **Annotations**: Add value annotations above each bar for clarity.
-  - **Figure Size**: Ensure optimal dimensions (e.g., 10x7 inches) for clear viewing.
-  - **Note**: Calories are not measured in grams.
+You have access to the following tool:
+create_nutrition_plot: Creates a nutrition facts visualization plot given a dictionary of nutrient values and a title.
 
+Guidelines for visualization:
+1. Extract the nutritional information from the recipe
+2. Format the data as a dictionary with nutrient names as keys and values as floats
+3. Create a descriptive title for the plot
+4. Use the create_nutrition_plot tool to generate the visualization
+5. Return the structured Visualization object with the plot details
 
-### Notes for Consistency
-- Save the plot in a high-resolution format for professional use.
-- Provide clear observations for each step.
+The input will be a Recipe object with nutritional information. Extract the relevant data and create an appropriate visualization.
 
-### Additional Tips
-- **Experiment with different plot types** (e.g., pie charts, line plots) if they better suit the data.
-- **Add annotations** to highlight specific points of interest.
-- **Customize the plot style** using Seaborn's built-in styles or by creating custom styles.
-
-
-### Begin Execution
-Thought: Sort the values in descending order and generate the plot based on the provided nutritional data. I will just save the image as `plot.png` but I don't need to do plt.show(). I am also very smart so I will annotate the calories with proper units since I know it's not in grams.
-
-### Response from the Recipe Agent is given in the next message:
-
+Remember:
+- Calories should be in kcal
+- Other nutrients should be in grams
+- Use clear, descriptive titles
+- Include all relevant nutritional information from the recipe
 """
 
 
